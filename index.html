@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Digital Twin AI Battery Shield | AI analysis</title>
+<style>
+:root{
+  --bg:#0b0b0d;
+  --ink:#f3efe8;
+  --muted:#8e8880;
+  --rule:#2a2622;
+  --amber:#e8b04a;
+  --orange:#d27a3a;
+  --ok:#79b595;
+  --crit:#e5533d;
+}
+*{box-sizing:border-box}
+html{background:var(--bg);box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{
+  margin:0;color:var(--ink);
+  font-family:"Segoe UI","Helvetica Neue",Calibri,system-ui,-apple-system,sans-serif;
+  background:
+    radial-gradient(ellipse 70% 40% at 50% 108%, rgba(168,88,36,.30), transparent 70%),
+    var(--bg);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:28px 24px 48px}
+h1,h2,h3,p,ol{margin:0}
+h2{font-size:15px;font-weight:600;letter-spacing:.01em}
+.num{font-variant-numeric:tabular-nums}
+
+/* header */
+.top{display:flex;align-items:center;justify-content:space-between;gap:20px;padding-bottom:26px;border-bottom:1px solid var(--rule)}
+.brand{display:flex;align-items:center;gap:18px}
+.brand svg{width:34px;height:auto;flex:none}
+h1{font-size:clamp(22px,3.4vw,34px);font-weight:700;line-height:1.1;letter-spacing:-.01em}
+.tag{color:var(--amber);font-size:13px;font-weight:600;margin-top:6px;letter-spacing:.02em}
+.chip{display:flex;align-items:center;gap:9px;padding:8px 14px;border:1px solid var(--rule);border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+.chip .dot{width:9px;height:9px;border-radius:50%;background:var(--ok);box-shadow:0 0 10px var(--ok)}
+.chip.watch .dot{background:var(--amber);box-shadow:0 0 10px var(--amber)}
+.chip.alert .dot{background:var(--crit);box-shadow:0 0 10px var(--crit)}
+.chip.alert{border-color:rgba(229,83,61,.5)}
+.chip.watch{border-color:rgba(232,176,74,.45)}
+
+/* main */
+.main{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(290px,1fr);padding:28px 0 0}
+.chartcol{padding-right:36px}
+.charthead{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px 20px;margin-bottom:10px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;color:var(--muted);font-size:12px}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{display:inline-block;width:16px;height:0;border-top:2px solid var(--ink)}
+.sw.twin{border-color:var(--orange)}
+.sw.fc{border-top:2px dotted var(--orange)}
+.sw.base{border-top:2px dotted var(--muted)}
+.sw.lim{border-top:2px dashed var(--crit)}
+canvas{display:block;width:100%;height:370px}
+
+/* AI panel */
+.ai{border-left:1px solid var(--rule);padding-left:32px;display:flex;flex-direction:column;gap:20px}
+.verdict{font-size:21px;font-weight:700;line-height:1.25;margin-top:-6px}
+.detail{color:#c9c3ba;font-size:14px;line-height:1.55}
+.risk .row{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);margin-bottom:8px}
+.risk .row b{color:var(--ink);font-weight:600}
+.bar{position:relative;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--ok) 0%,var(--amber) 55%,var(--crit) 100%);opacity:.9}
+.bar i{position:absolute;top:-5px;width:3px;height:16px;border-radius:2px;background:var(--ink);transform:translateX(-50%);transition:left .4s}
+.action{border-top:1px solid var(--rule);padding-top:16px}
+.action h3{font-size:12.5px;font-weight:600;color:var(--amber);margin-bottom:6px}
+.action p{font-size:14px;line-height:1.5}
+.balance{border-top:1px solid var(--rule);padding-top:16px;display:grid;gap:12px}
+.balance h3{font-size:12.5px;font-weight:600;color:var(--muted)}
+.hb .lab{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:5px;color:#c9c3ba}
+.hb .track{height:8px;background:#17151a;border-radius:2px;overflow:hidden}
+.hb .fill{height:100%;width:0;transition:width .35s}
+.hb.gen .fill{background:var(--orange)}
+.hb.rem .fill{background:var(--ok)}
+
+.ag{display:flex;justify-content:space-between;gap:12px;font-size:12.5px;color:#c9c3ba}
+.ag b{color:var(--ink);font-weight:600;text-align:right}
+.agn{font-size:11.5px;color:var(--muted);line-height:1.45}
+
+/* metric strip */
+.strip{display:grid;grid-template-columns:repeat(6,1fr);margin-top:30px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule)}
+.stat{padding:18px 18px 18px 20px;border-left:1px solid var(--rule);min-width:0}
+.stat:first-child{border-left:0;padding-left:0}
+.stat .l{font-size:12.5px;color:var(--muted)}
+.stat .v{font-size:26px;font-weight:700;margin:6px 0 4px;white-space:nowrap}
+.stat .v small{font-size:14px;font-weight:600;color:var(--muted);margin-left:2px}
+.stat .s{font-size:12px;color:var(--muted);line-height:1.35}
+.stat .v.amber{color:var(--amber)}
+.stat .v.crit{color:var(--crit)}
+.stat .v.ok{color:var(--ok)}
+
+/* lower */
+.lower{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(290px,1fr);padding-top:28px}
+.log{padding-right:36px}
+.log ol{list-style:none;padding:0;margin-top:12px;display:grid}
+.log li{display:grid;grid-template-columns:78px 14px 1fr;gap:0 10px;align-items:baseline;padding:9px 0;border-top:1px solid var(--rule);font-size:13.5px}
+.log li:first-child{border-top:0}
+.log time{color:var(--muted);font-size:12.5px}
+.log .pip{width:8px;height:8px;border-radius:50%;background:var(--muted);align-self:center}
+.log .pip.ok{background:var(--ok)}
+.log .pip.watch{background:var(--amber)}
+.log .pip.alert{background:var(--crit)}
+.controls{border-left:1px solid var(--rule);padding-left:32px;display:grid;gap:18px;align-content:start}
+.ctl label{display:flex;justify-content:space-between;font-size:13px;margin-bottom:8px;color:#c9c3ba}
+.ctl label b{color:var(--ink);font-weight:600}
+input[type=range]{width:100%;accent-color:var(--orange);height:22px;background:transparent}
+.btns{display:flex;gap:10px;flex-wrap:wrap}
+button{font:inherit;font-size:13px;font-weight:600;color:var(--ink);background:transparent;border:1px solid #403a34;border-radius:6px;padding:9px 14px;cursor:pointer;transition:background .15s,border-color .15s}
+button:hover{background:#1a1714;border-color:var(--orange)}
+button[aria-pressed=true]{background:rgba(210,122,58,.16);border-color:var(--orange);color:var(--amber)}
+:focus-visible{outline:2px solid var(--amber);outline-offset:3px;border-radius:4px}
+.note{margin-top:34px;color:var(--muted);font-size:12px;line-height:1.5;max-width:760px}
+
+@media (max-width:900px){
+  .main,.lower{grid-template-columns:1fr}
+  .chartcol,.log{padding-right:0}
+  .ai,.controls{border-left:0;padding-left:0;border-top:1px solid var(--rule);margin-top:26px;padding-top:24px}
+  .strip{grid-template-columns:repeat(3,1fr)}
+  .stat:nth-child(4){border-left:0;padding-left:0}
+  .stat:nth-child(n+4){border-top:1px solid var(--rule)}
+}
+@media (max-width:560px){
+  .wrap{padding:20px 16px 40px}
+  .top{flex-direction:column;align-items:flex-start}
+  canvas{height:270px}
+  .strip{grid-template-columns:repeat(2,1fr)}
+  .stat:nth-child(n){border-left:1px solid var(--rule);padding-left:16px;border-top:0}
+  .stat:nth-child(odd){border-left:0;padding-left:0}
+  .stat:nth-child(n+3){border-top:1px solid var(--rule)}
+  .verdict{font-size:19px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 90 130" fill="none" aria-hidden="true">
+      <path d="M45 4 L86 20 V70 C86 98 66 118 45 126 C24 118 4 98 4 70 V20 Z" stroke="#d9d4cc" stroke-width="2.5" stroke-linejoin="round"/>
+      <path d="M22 98 C34 92 38 64 48 40 L68 60" stroke="#e8e2d9" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="48" cy="40" r="5" fill="#d27a3a"/>
+    </svg>
+    <div>
+      <h1>Digital Twin AI Battery Shield</h1>
+      <p class="tag">Optimizing battery energy storage in harsh climates</p>
+    </div>
+  </div>
+  <div class="chip" id="chip" role="status"><span class="dot"></span><span id="chipText">Twin in sync</span></div>
+</header>
+
+<section class="main">
+  <div class="chartcol">
+    <div class="charthead">
+      <h2>Battery temperature: measured vs digital twin</h2>
+      <div class="legend">
+        <span><i class="sw"></i>Measured</span>
+        <span><i class="sw twin"></i>Twin</span>
+        <span><i class="sw fc"></i>30 min forecast</span>
+        <span><i class="sw base"></i>Without shield</span>
+        <span><i class="sw lim"></i>Safety limit</span>
+      </div>
+    </div>
+    <canvas id="cv" role="img" aria-label="Line chart of measured battery temperature, digital twin prediction, and a 30 minute forecast against the safety limit"></canvas>
+  </div>
+
+  <aside class="ai" aria-label="AI analysis">
+    <h2>AI analysis</h2>
+    <p class="verdict" id="verdict"></p>
+    <p class="detail" id="detail"></p>
+
+    <div class="risk">
+      <div class="row"><span>Thermal risk, next 30 min</span><b id="riskLabel">Low</b></div>
+      <div class="bar"><i id="riskMark" style="left:0%"></i></div>
+    </div>
+
+    <div class="action">
+      <h3>Suggested action</h3>
+      <p id="action"></p>
+    </div>
+
+    <div class="balance">
+      <h3>Heat balance right now</h3>
+      <div class="hb gen"><div class="lab"><span>Generated by current (I²R)</span><span class="num" id="genV"></span></div><div class="track"><div class="fill" id="genB"></div></div></div>
+      <div class="hb rem"><div class="lab"><span>Removed to the air</span><span class="num" id="remV"></span></div><div class="track"><div class="fill" id="remB"></div></div></div>
+    </div>
+
+    <div class="balance">
+      <h3>Aging, Arrhenius model</h3>
+      <div class="ag"><span>Aging speed now, vs 25°C</span><b class="num" id="agNow"></b></div>
+      <div class="ag"><span>Aging avoided by the shield</span><b class="num" id="agSave"></b></div>
+      <p class="agn">Relative rate of heat-driven side reactions (SEI growth), not total battery life. The range uses activation energies of 60 and 80 kJ/mol.</p>
+    </div>
+  </aside>
+</section>
+
+<section class="strip" aria-label="Live readings">
+  <div class="stat"><div class="l">Battery temperature</div><div class="v num" id="mTemp"></div><div class="s">Probe on the cell</div></div>
+  <div class="stat"><div class="l">Twin prediction</div><div class="v num" id="mPred"></div><div class="s">Physics model with AI calibration</div></div>
+  <div class="stat"><div class="l">Residual</div><div class="v num" id="mRes"></div><div class="s">Measured minus twin</div></div>
+  <div class="stat"><div class="l">Forecast peak</div><div class="v num" id="mPeak"></div><div class="s" id="mPeakS"></div></div>
+  <div class="stat"><div class="l">Cooling fan</div><div class="v" id="mFan"></div><div class="s">Auto: runs when the cell is warmer than the air</div></div>
+  <div class="stat"><div class="l">Cell health</div><div class="v num" id="mHealth"></div><div class="s" id="mHealthS"></div></div>
+</section>
+
+<section class="lower">
+  <div class="log">
+    <h2>Event log</h2>
+    <ol id="log" aria-live="off"></ol>
+  </div>
+  <div class="controls">
+    <h2>Scenario</h2>
+    <div class="ctl">
+      <label for="sAmb"><span>Ambient temperature</span><b class="num" id="vAmb"></b></label>
+      <input id="sAmb" type="range" min="20" max="55" step="1" value="40">
+    </div>
+    <div class="ctl">
+      <label for="sI"><span>Load current</span><b class="num" id="vI"></b></label>
+      <input id="sI" type="range" min="0" max="20" step="1" value="10">
+    </div>
+    <div class="btns">
+      <button id="bFault" aria-pressed="false">Simulate cell degradation</button>
+      <button id="bPause" aria-pressed="false">Pause</button>
+    </div>
+  </div>
+</section>
+
+<p class="note">Demo data: the cell, sensors, and load are simulated with the same heat equation the ESP32 runs. To connect the real prototype, replace the readings in <code>tick()</code> with the current from the INA219, the battery probe, and the ambient probe. Aging uses the Arrhenius equation with an activation energy of 60 to 80 kJ/mol for SEI growth (Mohammad et al., 2026, Materials Today Communications). Without shield means the same cell and load with no fan.</p>
+</div>
+
+<script>
+(function(){
+  /* ---------- model ---------- */
+  var N = 180, DT = 10;                       // 180 steps of 10 s = 30 min each side
+  var P = { m:0.5, cp:1000, R0:0.05, hA:0.8, hAfan:1.6, hAtrue:0.72, hfTrue:1.5, limit:45 };
+  var S = { step:0, Tmeas:30, Tpred:30, Tbase:30, a:[{s:0,b:0},{s:0,b:0}], Rest:P.R0, trueR:P.R0, fan:false,
+            I:10, Tamb:40, fault:false, paused:false, ema:0, status:'ok', peak:30, eta:null, fc:[] };
+  var H = { meas:[], pred:[], base:[] };
+  var LOG = [];
+
+  function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+  function gauss(){ var u=0,v=0; while(!u)u=Math.random(); while(!v)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+  function fanRule(T,Ta){ return T > Ta && T > 35; }
+  function advance(T,I,R,Ta,fan,hb,hf){
+    var hA = hb + (fan ? hf : 0);
+    return T + ((I*I*R + hA*(Ta - T)) / (P.m*P.cp)) * DT;
+  }
+  function forecast(){
+    var T = S.Tmeas, out = [];
+    for(var i=0;i<N;i++){
+      var f = fanRule(T,S.Tamb);
+      T = advance(T,S.I,S.Rest,S.Tamb,f,P.hA,P.hAfan);
+      out.push(T);
+    }
+    return out;
+  }
+
+  var EA = [60000, 80000];
+  function arr(T,Ea){ return Math.exp(-Ea/8.314*(1/(T+273.15)-1/298.15)); }
+
+  function tick(silent){
+    // real system (simulated)
+    S.trueR += ((S.fault ? P.R0*2.3 : P.R0) - S.trueR) * 0.03;
+    var fanNow = fanRule(S.Tmeas, S.Tamb);
+    if(!silent && fanNow !== S.fan){ logEv(fanNow ? 'Fan switched on' : 'Fan switched off', 'ok'); }
+    S.fan = fanNow;
+    S.Tmeas = advance(S.Tmeas,S.I,S.trueR,S.Tamb,fanNow,P.hAtrue,P.hfTrue) + gauss()*0.05;
+
+    // digital twin + AI calibration
+    S.Tpred = advance(S.Tpred,S.I,S.Rest,S.Tamb,fanNow,P.hA,P.hAfan);
+    var err = S.Tmeas - S.Tpred;
+    if(S.I > 2){ S.Rest = clamp(S.Rest + 0.0006*err, 0.03, 0.22); }
+    S.Tpred += 0.02*err;
+    S.ema = S.ema*0.8 + err*0.2;
+
+    // same cell and load without the shield (no fan), and Arrhenius aging for both
+    S.Tbase = advance(S.Tbase,S.I,S.trueR,S.Tamb,false,P.hAtrue,P.hfTrue);
+    for(var e=0;e<2;e++){ S.a[e].s += arr(S.Tmeas,EA[e])*DT; S.a[e].b += arr(S.Tbase,EA[e])*DT; }
+
+    H.meas.push(S.Tmeas); H.pred.push(S.Tpred); H.base.push(S.Tbase);
+    if(H.meas.length > N){ H.meas.shift(); H.pred.shift(); H.base.shift(); }
+    S.step++;
+  }
+
+  /* ---------- analysis ---------- */
+  function evaluate(){
+    S.fc = forecast();
+    var peak = -1e9, eta = null, i;
+    for(i=0;i<S.fc.length;i++){
+      if(S.fc[i] > peak) peak = S.fc[i];
+      if(eta === null && S.fc[i] >= P.limit) eta = Math.max(1, Math.round((i+1)*DT/60));
+    }
+    S.peak = peak; S.eta = eta;
+    var ratio = S.Rest / P.R0, a = Math.abs(S.ema);
+    var status = 'ok';
+    if(peak >= P.limit || S.Tmeas >= P.limit || a > 3) status = 'alert';
+    else if(a > 1.5 || ratio > 1.4 || peak >= P.limit - 2) status = 'watch';
+    return status;
+  }
+  function safeCurrent(){
+    var head = P.limit - 1.5 - S.Tamb;
+    if(head <= 0) return 0;
+    return Math.sqrt(head * (P.hA + P.hAfan) / S.Rest);
+  }
+
+  /* ---------- log ---------- */
+  function stamp(){
+    var s = S.step*DT, m = Math.floor(s/60), r = s%60;
+    return (m<10?'0':'')+m+':'+(r<10?'0':'')+r;
+  }
+  function logEv(text, level){
+    LOG.unshift({t:stamp(), text:text, level:level||'ok'});
+    if(LOG.length > 7) LOG.pop();
+  }
+
+  /* ---------- DOM ---------- */
+  function $(id){ return document.getElementById(id); }
+  function f1(v){ return v.toFixed(1); }
+
+  function render(){
+    var status = evaluate();
+    if(status !== S.status){
+      var msg = status==='ok' ? 'Back to normal: twin and sensor agree'
+              : status==='watch' ? 'Watch: temperature or resistance drifting from the model'
+              : 'Alert: battery forecast to exceed the safe limit';
+      logEv(msg, status);
+      S.status = status;
+    }
+    var chip = $('chip');
+    chip.className = 'chip' + (status==='ok' ? '' : ' ' + status);
+    $('chipText').textContent = status==='ok' ? 'Twin in sync' : status==='watch' ? 'Watch' : 'Alert';
+
+    var ratio = S.Rest / P.R0, a = Math.abs(S.ema), gen = S.I*S.I*S.Rest;
+    var rem = (P.hA + (S.fan ? P.hAfan : 0)) * (S.Tmeas - S.Tamb);
+    var safeI = safeCurrent(), verdict, detail, action;
+
+    if(S.Tmeas >= P.limit || S.peak >= P.limit){
+      verdict = S.Tmeas >= P.limit ? 'Battery is above the ' + P.limit + '°C limit.'
+                                   : 'Battery will pass ' + P.limit + '°C in about ' + S.eta + ' min.';
+      detail = 'At ' + S.I + ' A and ' + S.Tamb + '°C ambient, the twin forecasts a peak of ' + f1(S.peak) + '°C. The cell makes ' + f1(gen) + ' W of heat, more than the fan and enclosure can remove.';
+      action = safeI >= 1 ? 'Reduce the load to about ' + Math.floor(safeI) + ' A or lower, or cool the enclosure.'
+                          : 'Pause heavy loads until the ambient temperature drops.';
+    } else if(ratio > 1.4){
+      verdict = 'The cell is heating more than a healthy one.';
+      detail = 'The AI estimates internal resistance at ' + Math.round(S.Rest*1000) + ' mΩ, ' + Math.round((ratio-1)*100) + '% above the healthy ' + Math.round(P.R0*1000) + ' mΩ baseline. The same current now creates more heat.';
+      action = 'Check terminals and connections. If the estimate keeps rising, plan to replace the cell.';
+    } else if(a > 1.5){
+      verdict = 'Sensor and twin disagree by ' + f1(a) + '°C.';
+      detail = 'The probe reads ' + (S.ema > 0 ? 'above' : 'below') + ' the twin. The AI is recalibrating the model to match the cell.';
+      action = 'If this stays, check that the probe touches the cell and the fan path is clear.';
+    } else {
+      verdict = 'Battery is behaving as the twin predicts.';
+      detail = 'The residual is ' + f1(a) + '°C. The 30 minute peak is ' + f1(S.peak) + '°C, ' + f1(P.limit - S.peak) + '°C under the limit.';
+      action = 'No action needed. The fan runs on its own when the cell is warmer than the air.';
+    }
+    $('verdict').textContent = verdict;
+    $('detail').textContent = detail;
+    $('action').textContent = action;
+
+    var risk = clamp((S.peak - (P.limit - 8)) / 14, 0, 1) * 100;
+    $('riskMark').style.left = risk + '%';
+    $('riskLabel').textContent = risk < 30 ? 'Low' : risk < 60 ? 'Elevated' : risk < 85 ? 'High' : 'Critical';
+
+    var mx = Math.max(15, gen, rem) * 1.1;
+    $('genV').textContent = f1(gen) + ' W';
+    $('remV').textContent = f1(rem) + ' W';
+    $('genB').style.width = clamp(gen/mx*100,0,100) + '%';
+    $('remB').style.width = clamp(rem/mx*100,0,100) + '%';
+
+    $('mTemp').innerHTML = f1(S.Tmeas) + '<small>°C</small>';
+    $('mPred').innerHTML = f1(S.Tpred) + '<small>°C</small>';
+    var resEl = $('mRes');
+    resEl.innerHTML = (S.ema>=0?'+':'') + f1(S.ema) + '<small>°C</small>';
+    resEl.className = 'v num' + (a > 3 ? ' crit' : a > 1.5 ? ' amber' : ' ok');
+    var pk = $('mPeak');
+    pk.innerHTML = f1(S.peak) + '<small>°C</small>';
+    pk.className = 'v num' + (S.peak >= P.limit ? ' crit' : S.peak >= P.limit-2 ? ' amber' : '');
+    $('mPeakS').textContent = S.eta ? 'Reaches the limit in ' + S.eta + ' min' : 'Under the ' + P.limit + '°C limit for 30 min';
+    var fan = $('mFan');
+    fan.textContent = S.fan ? 'On' : 'Off';
+    fan.className = 'v' + (S.fan ? ' amber' : '');
+    var health = clamp(Math.round(100/ratio), 0, 100);
+    var hEl = $('mHealth');
+    hEl.innerHTML = health + '<small>%</small>';
+    hEl.className = 'v num' + (health < 60 ? ' crit' : health < 75 ? ' amber' : ' ok');
+    $('mHealthS').textContent = 'Internal resistance ' + Math.round(S.Rest*1000) + ' mΩ';
+
+    var a0 = S.a[0], a1 = S.a[1];
+    $('agNow').textContent = arr(S.Tmeas,EA[0]).toFixed(1) + '× to ' + arr(S.Tmeas,EA[1]).toFixed(1) + '×';
+    $('agSave').textContent = a0.b > 0 ? Math.max(0,Math.round((1-a0.s/a0.b)*100)) + '% to ' + Math.max(0,Math.round((1-a1.s/a1.b)*100)) + '%' : 'calculating';
+
+    var ol = $('log'), html = '';
+    LOG.forEach(function(e){
+      html += '<li><time class="num">' + e.t + '</time><span class="pip ' + e.level + '"></span><span>' + e.text + '</span></li>';
+    });
+    ol.innerHTML = html;
+
+    draw();
+  }
+
+  /* ---------- chart ---------- */
+  var cv = $('cv');
+  var C = { ink:'#f3efe8', muted:'#8e8880', rule:'#2a2622', orange:'#d27a3a', amber:'#e8b04a', crit:'#e5533d' };
+
+  function draw(){
+    var dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+    if(!w || !h) return;
+    if(cv.width !== Math.round(w*dpr) || cv.height !== Math.round(h*dpr)){ cv.width = Math.round(w*dpr); cv.height = Math.round(h*dpr); }
+    var g = cv.getContext('2d');
+    g.setTransform(dpr,0,0,dpr,0,0);
+    g.clearRect(0,0,w,h);
+
+    var padL = 40, padR = 12, padT = 16, padB = 28, iw = w-padL-padR, ih = h-padT-padB;
+    var fc = S.fc, all = H.meas.concat(H.pred, H.base, fc, [P.limit, S.Tamb]);
+    var lo = Math.floor((Math.min.apply(null, all) - 2)/5)*5, hi = Math.ceil((Math.max.apply(null, all) + 2)/5)*5;
+    function X(i){ return padL + iw * i/(2*N-1); }
+    function Y(v){ return padT + ih*(1-(v-lo)/(hi-lo)); }
+    var nowI = N-1, nowX = X(nowI);
+
+    // forecast zone
+    g.fillStyle = 'rgba(210,122,58,0.05)';
+    g.fillRect(nowX, padT, padL+iw-nowX, ih);
+
+    // grid
+    g.font = '11px "Segoe UI",system-ui,sans-serif';
+    g.textBaseline = 'middle'; g.textAlign = 'right';
+    for(var v=lo; v<=hi; v+=5){
+      g.strokeStyle = C.rule; g.lineWidth = 1;
+      g.beginPath(); g.moveTo(padL, Y(v)+.5); g.lineTo(padL+iw, Y(v)+.5); g.stroke();
+      g.fillStyle = C.muted; g.fillText(v + '°', padL-8, Y(v));
+    }
+
+    // ambient
+    g.setLineDash([2,4]); g.strokeStyle = 'rgba(142,136,128,.7)';
+    g.beginPath(); g.moveTo(padL, Y(S.Tamb)); g.lineTo(padL+iw, Y(S.Tamb)); g.stroke();
+    g.setLineDash([]);
+    g.textAlign = 'left'; g.fillStyle = C.muted;
+    g.fillText('Ambient ' + S.Tamb + '°C', padL+6, Y(S.Tamb)+ (Y(S.Tamb) > Y(P.limit)+16 ? -9 : 11));
+
+    // limit
+    g.setLineDash([7,5]); g.strokeStyle = C.crit; g.lineWidth = 1.4;
+    g.beginPath(); g.moveTo(padL, Y(P.limit)); g.lineTo(padL+iw, Y(P.limit)); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = C.crit; g.textAlign = 'right';
+    g.fillText('Limit ' + P.limit + '°C', padL+iw-4, Y(P.limit)-9);
+
+    // without the shield
+    g.setLineDash([3,4]); g.strokeStyle = 'rgba(142,136,128,.9)'; g.lineWidth = 1.3; g.beginPath();
+    H.base.forEach(function(v,i){ i===0 ? g.moveTo(X(i),Y(v)) : g.lineTo(X(i),Y(v)); });
+    g.stroke(); g.setLineDash([]);
+
+    // residual fill
+    var rc = S.status==='alert' ? 'rgba(229,83,61,.22)' : 'rgba(232,176,74,.20)';
+    g.fillStyle = rc; g.beginPath();
+    H.meas.forEach(function(v,i){ i===0 ? g.moveTo(X(i),Y(v)) : g.lineTo(X(i),Y(v)); });
+    for(var j=H.pred.length-1; j>=0; j--){ g.lineTo(X(j), Y(H.pred[j])); }
+    g.closePath(); g.fill();
+
+    // twin line
+    g.save(); g.shadowColor = C.orange; g.shadowBlur = 8;
+    g.strokeStyle = C.orange; g.lineWidth = 1.6; g.beginPath();
+    H.pred.forEach(function(v,i){ i===0 ? g.moveTo(X(i),Y(v)) : g.lineTo(X(i),Y(v)); });
+    g.stroke(); g.restore();
+
+    // measured line
+    g.strokeStyle = C.ink; g.lineWidth = 1.8; g.lineJoin = 'round'; g.beginPath();
+    H.meas.forEach(function(v,i){ i===0 ? g.moveTo(X(i),Y(v)) : g.lineTo(X(i),Y(v)); });
+    g.stroke();
+
+    // now line
+    g.strokeStyle = 'rgba(243,239,232,.3)'; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(nowX+.5, padT); g.lineTo(nowX+.5, padT+ih); g.stroke();
+
+    // forecast trail (fading dots and squares, like the brand mark)
+    var peakJ = 0;
+    for(var k=0;k<fc.length;k++){ if(fc[k] > fc[peakJ]) peakJ = k; }
+    for(var q=0;q<fc.length;q++){
+      var t = q/fc.length, x = X(N+q), y = Y(fc[q]);
+      if(q % 30 === 15){
+        var sz = 7 - 4*t;
+        g.fillStyle = 'rgba(210,122,58,' + (0.95 - 0.7*t) + ')';
+        g.fillRect(x - sz/2, y - sz/2, sz, sz);
+      } else if(q % 2 === 0){
+        g.fillStyle = 'rgba(232,150,70,' + (0.9 - 0.75*t) + ')';
+        g.beginPath(); g.arc(x, y, 2.6 - 1.9*t, 0, 6.283); g.fill();
+      }
+    }
+
+    // head glow at now
+    var hy = Y(S.Tmeas);
+    var grad = g.createRadialGradient(nowX,hy,0,nowX,hy,16);
+    grad.addColorStop(0,'rgba(232,150,70,.85)'); grad.addColorStop(1,'rgba(232,150,70,0)');
+    g.fillStyle = grad; g.beginPath(); g.arc(nowX,hy,16,0,6.283); g.fill();
+    g.fillStyle = C.ink; g.beginPath(); g.arc(nowX,hy,3.4,0,6.283); g.fill();
+
+    // peak label
+    if(S.peak > S.Tmeas + 0.6){
+      var px = X(N+peakJ), py = Y(S.peak);
+      g.fillStyle = S.peak >= P.limit ? C.crit : C.amber;
+      g.beginPath(); g.arc(px,py,3.5,0,6.283); g.fill();
+      g.textAlign = px > padL+iw-70 ? 'right' : 'left';
+      g.textBaseline = 'bottom';
+      g.fillText('Peak ' + f1(S.peak) + '°C', px + (g.textAlign==='right' ? -6 : 6), py-6);
+      g.textBaseline = 'middle';
+    }
+
+    // x labels
+    g.fillStyle = C.muted; g.textBaseline = 'top';
+    g.textAlign = 'left'; g.fillText('30 min ago', padL, padT+ih+9);
+    g.textAlign = 'center'; g.fillStyle = C.ink; g.fillText('Now', nowX, padT+ih+9);
+    g.textAlign = 'right'; g.fillStyle = C.muted; g.fillText('+30 min', padL+iw, padT+ih+9);
+  }
+
+  /* ---------- controls ---------- */
+  var sAmb = $('sAmb'), sI = $('sI');
+  function syncLabels(){ $('vAmb').textContent = S.Tamb + '°C'; $('vI').textContent = S.I + ' A'; }
+  sAmb.addEventListener('input', function(){ S.Tamb = +sAmb.value; syncLabels(); render(); });
+  sI.addEventListener('input', function(){ S.I = +sI.value; syncLabels(); render(); });
+  sAmb.addEventListener('change', function(){ logEv('Ambient set to ' + S.Tamb + '°C', 'ok'); render(); });
+  sI.addEventListener('change', function(){ logEv('Load set to ' + S.I + ' A', 'ok'); render(); });
+
+  var bFault = $('bFault');
+  bFault.addEventListener('click', function(){
+    S.fault = !S.fault;
+    bFault.setAttribute('aria-pressed', S.fault);
+    bFault.textContent = S.fault ? 'Restore healthy cell' : 'Simulate cell degradation';
+    logEv(S.fault ? 'Cell degradation started: resistance rising' : 'Cell restored to healthy resistance', S.fault ? 'watch' : 'ok');
+    render();
+  });
+  var bPause = $('bPause');
+  bPause.addEventListener('click', function(){
+    S.paused = !S.paused;
+    bPause.setAttribute('aria-pressed', S.paused);
+    bPause.textContent = S.paused ? 'Resume' : 'Pause';
+    render();
+  });
+
+  window.addEventListener('resize', draw);
+
+  /* ---------- start ---------- */
+  syncLabels();
+  for(var w0=0; w0<N; w0++){ tick(true); }
+  S.a = [{s:0,b:0},{s:0,b:0}];
+  S.status = evaluate();
+  logEv('Twin calibrated on 30 min of history', 'ok');
+  render();
+
+  var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  setInterval(function(){
+    if(S.paused) return;
+    tick(false);
+    render();
+  }, calm ? 1000 : 125);
+})();
+</script>
+</body>
+</html>
